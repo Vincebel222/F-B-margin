@@ -477,9 +477,26 @@
   .add-panel .add-note b{color:var(--cyan);}
   .add-grid{
     display:grid;
-    grid-template-columns:1.3fr 1fr 0.85fr 0.85fr 0.85fr 0.85fr auto;
+    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
     gap:10px;
     align-items:end;
+  }
+  .add-grid .add-btn-cell{ grid-column: 1 / -1; display:flex; justify-content:flex-end; }
+  .product-link-icon{
+    color:var(--cyan);
+    text-decoration:none;
+    font-size:12px;
+    margin-left:6px;
+    white-space:nowrap;
+  }
+  .product-link-icon:hover{ text-decoration:underline; }
+  .link-cell input{ text-align:left; }
+  .link-empty{ color:var(--slate-soft); font-size:12px; }
+  .deposit-mark{
+    color:var(--cyan);
+    font-size:11px;
+    cursor:help;
+    margin-left:2px;
   }
   .add-grid label{
     display:block;
@@ -718,12 +735,12 @@
     <h3>Import products <span id="importTargetLabel" class="import-target">→ Canada</span></h3>
     <p class="import-help">
       Paste rows copied from Excel/Sheets or a CSV. One product per line, columns in this order:<br>
-      <code>Category, Name, Case Cost, # per Case, Unit Cost, Sell Price</code><br>
-      Case Cost, # per Case, and Unit Cost may be left blank individually — but if Case Cost and # per Case are both filled in, Unit Cost is calculated automatically and any value you paste there is ignored. Works with commas or tabs. Older 5-column lists (without # per Case) still work fine. A header row is skipped automatically.
+      <code>Category, Name, Case Cost, # per Case, Unit Cost, Sell Price, Link</code><br>
+      Case Cost, # per Case, Unit Cost, and Link may all be left blank individually — but if Case Cost and # per Case are both filled in, Unit Cost is calculated automatically (plus a $0.10 deposit for Beverage items) and any value you paste there is ignored. Works with commas or tabs. Older 5 or 6-column lists still work fine. A header row is skipped automatically.
     </p>
-    <textarea id="importText" placeholder="Candy, Skittles, 46.39, 36, , 3.00
-Beverage, Coke/Sprite/Zero, 25.83, , 0.81, 2.50
-Hot Food, Pogo, , , 0.60, 2.50"></textarea>
+    <textarea id="importText" placeholder="Candy, Skittles, 46.49, 36, , 3.00, https://www.costcobusinesscentre.ca/skittles-original-candy
+Beverage, Coke/Sprite/Zero, 22.79, 32, , 2.50,
+Hot Food, Pogo, 19.09, 30, , 2.50, https://www.costcobusinesscentre.ca/pogo-corn-dogs"></textarea>
     <div class="import-actions">
       <div id="importPreview" class="import-preview"></div>
       <div style="display:flex; gap:8px;">
@@ -765,6 +782,10 @@ Hot Food, Pogo, , , 0.60, 2.50"></textarea>
         <input type="number" id="newSellPrice" step="0.01">
       </div>
       <div>
+        <label>Product link (optional)</label>
+        <input type="text" id="newLink" placeholder="https://...">
+      </div>
+      <div class="add-btn-cell">
         <button class="btn btn-primary" id="addBtn">Add product</button>
       </div>
     </div>
@@ -773,7 +794,7 @@ Hot Food, Pogo, , , 0.60, 2.50"></textarea>
 </div>
 
 <footer class="note">
-  Margin % = (Sell price − Unit cost) ⁄ Sell price. Case cost is informational unless paired with # per case, in which case Unit cost = Case cost ÷ # per case, calculated automatically. This is a shared live document — anyone with the link can view it; staff who enter the password can edit it, and changes sync live for everyone.
+  Margin % = (Sell price − Unit cost) ⁄ Sell price. Case cost is informational unless paired with # per case, in which case Unit cost = Case cost ÷ # per case, calculated automatically — and for anything in the Beverage category, a $0.10 Quebec bottle/can deposit is added on top automatically (marked with † in the table). This is a shared live document — anyone with the link can view it; staff who enter the password can edit it, and changes sync live for everyone.
 </footer>
 
 <div class="modal-overlay" id="modalOverlay" style="display:none;">
@@ -781,7 +802,7 @@ Hot Food, Pogo, , , 0.60, 2.50"></textarea>
 </div>
 
 <script>
-// ---------- Storage: Firebase Firestore (works on any host, no Claude account needed) ----------
+// ---------- Storage: Firebase Firestore ----------
 //
 // >>> REPLACE THIS with the config Firebase gave you when you registered your web app <
 const firebaseConfig = {
@@ -791,7 +812,6 @@ const firebaseConfig = {
   storageBucket: "food-and-beverage-margins.firebasestorage.app",
   messagingSenderId: "172869723369",
   appId: "1:172869723369:web:98077b975ce5ed6016bc78",
-  measurementId: "G-KDFEH5Q0QL"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -820,15 +840,12 @@ async function saveProducts(){
       products: products,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    // setSyncState("synced") happens automatically via the listener below
   } catch(err){
     console.error("Save failed:", err);
     setSyncState("error");
   }
 }
 
-// Real-time listener: every client sees changes the moment anyone saves —
-// no manual refresh needed. This replaces the old load/refresh-button model.
 function startLiveSync(){
   setSyncState("loading");
   productsDocRef.onSnapshot(
@@ -838,7 +855,6 @@ function startLiveSync(){
         setSyncState("synced");
         renderAll();
       } else if(!firestoreReady){
-        // Genuinely no data yet anywhere — this device seeds the defaults once.
         firestoreReady = true;
         products = defaultSeedProducts();
         saveProducts();
@@ -849,8 +865,6 @@ function startLiveSync(){
       console.error("Live sync error:", err);
       setSyncState("error");
       if(products.length === 0){
-        // Show something rather than a blank page if Firebase isn't reachable
-        // (e.g. config not filled in yet) — this is NOT saved back to the DB.
         products = defaultSeedProducts();
         renderAll();
       }
@@ -859,7 +873,6 @@ function startLiveSync(){
 }
 
 document.getElementById("refreshBtn").addEventListener("click", () => {
-  // With live sync this is rarely needed, but forces a fresh read just in case.
   productsDocRef.get().then(doc => {
     if(doc.exists && doc.data().products){
       products = doc.data().products;
@@ -1004,64 +1017,70 @@ modeBadge.addEventListener("click", () => {
   }
 });
 
-// ---------- Default seed data ----------
+// ---------- Default seed data (used only if Firestore is empty) ----------
 function defaultSeedProducts(){
   const seed = [
-    {name:"Skittles", category:"Candy", caseCost:46.39, unitCost:1.29, sellPrice:3},
-    {name:"Aero", category:"Candy", caseCost:53.79, unitCost:1.20, sellPrice:3},
-    {name:"Coffee Crisp", category:"Candy", caseCost:53.99, unitCost:1.12, sellPrice:3},
-    {name:"Twix", category:"Candy", caseCost:48.09, unitCost:1.34, sellPrice:3},
-    {name:"Smarties", category:"Candy", caseCost:27.39, unitCost:1.41, sellPrice:3},
-    {name:"Caramilk", category:"Candy", caseCost:55.49, unitCost:1.16, sellPrice:3},
-    {name:"Hershey's CC", category:"Candy", caseCost:37.99, unitCost:1.06, sellPrice:3},
-    {name:"Cotton Candy", category:"Candy", caseCost:61.18, unitCost:2.55, sellPrice:4},
-    {name:"Reese's", category:"Candy", caseCost:54.19, unitCost:1.13, sellPrice:3},
+    // CANDY
+    {name:"Skittles", category:"Candy", caseCost:46.49, unitsPerCase:36, unitCost:1.29, sellPrice:3, link:"https://www.costcobusinesscentre.ca/skittles-original-candy-36--61-g.product.100281410.html"},
+    {name:"Aero", category:"Candy", caseCost:74.29, unitsPerCase:48, unitCost:1.20, sellPrice:3, link:"https://www.costcobusinesscentre.ca/aero-milk-original-chocolate-bars-48--42-g.product.100281765.html"},
+    {name:"Coffee Crisp", category:"Candy", caseCost:74.49, unitsPerCase:48, unitCost:1.12, sellPrice:3, link:"https://www.costcobusinesscentre.ca/coffee-crisp-original-chocolate-wafer-bars-48--50-g.product.100281614.html"},
+    {name:"Twix", category:"Candy", caseCost:52.19, unitsPerCase:36, unitCost:1.34, sellPrice:3, link:"https://www.costcobusinesscentre.ca/twix-cookie-chocolate-bars-36--50-g.product.100282194.html"},
+    {name:"Smarties", category:"Candy", caseCost:37.59, unitsPerCase:24, unitCost:1.41, sellPrice:3, link:"https://www.costcobusinesscentre.ca/smarties-original-chocolate-candy-24--45-g.product.100283379.html"},
+    {name:"Caramilk", category:"Candy", caseCost:62.59, unitsPerCase:48, unitCost:1.16, sellPrice:3, link:"https://www.costcobusinesscentre.ca/cadbury-caramilk-chocolate-bars-48--50-g.product.100283844.html"},
+    {name:"Hershey's CC", category:"Candy", caseCost:48.09, unitsPerCase:36, unitCost:1.06, sellPrice:3, link:"https://www.costcobusinesscentre.ca/hersheys-cookies-n-creme-chocolate-bars-36--43-g.product.100281658.html"},
+    {name:"Cotton Candy", category:"Candy", caseCost:null, unitsPerCase:null, unitCost:2.55, sellPrice:4},
+    {name:"Reese's", category:"Candy", caseCost:65.39, unitsPerCase:48, unitCost:1.13, sellPrice:3, link:"https://www.costcobusinesscentre.ca/reese-peanut-butter-cups-48--46-g.product.100281388.html"},
     {name:"iSaute candy", category:"Candy", caseCost:null, unitCost:1.20, sellPrice:3},
     {name:"iSaute candy 2/5$", category:"Candy", caseCost:null, unitCost:2.40, sellPrice:5},
-    {name:"Coke/Sprite/Zero", category:"Beverage", caseCost:25.83, unitCost:0.81, sellPrice:2.5},
-    {name:"Gatorade", category:"Beverage", caseCost:36.60, unitCost:1.30, sellPrice:3},
-    {name:"Prime", category:"Beverage", caseCost:29.79, unitCost:1.65, sellPrice:4.5},
-    {name:"Fuze", category:"Beverage", caseCost:24.49, unitCost:0.76, sellPrice:2.5},
-    {name:"Bubly", category:"Beverage", caseCost:17.83, unitCost:0.74, sellPrice:2.5},
-    {name:"Peace Tea", category:"Beverage", caseCost:16.49, unitCost:1.37, sellPrice:3},
-    {name:"Apple juice", category:"Beverage", caseCost:21.63, unitCost:0.90, sellPrice:2.5},
-    {name:"Orange juice", category:"Beverage", caseCost:24.63, unitCost:1.03, sellPrice:2.5},
-    {name:"Grape juice", category:"Beverage", caseCost:20.63, unitCost:0.86, sellPrice:2.5},
-    {name:"Chocolate milk", category:"Beverage", caseCost:15.55, unitCost:0.97, sellPrice:2.5},
-    {name:"Water", category:"Beverage", caseCost:12.59, unitCost:0.31, sellPrice:2.25},
-    {name:"Coffee (K-cup)", category:"Beverage", caseCost:50.59, unitCost:0.42, sellPrice:2.5},
-    {name:"Pogo", category:"Hot Food", caseCost:17.99, unitCost:0.60, sellPrice:2.5},
+    // BEVERAGE
+    {name:"Coke/Sprite/Zero", category:"Beverage", caseCost:22.79, unitsPerCase:32, unitCost:0.81, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/p/-/coca-cola-32-355-ml/100281013?remoteHost=app07&sp=lws&langId=-24"},
+    {name:"Gatorade", category:"Beverage", caseCost:29.75, unitsPerCase:28, unitCost:1.30, sellPrice:3, link:"https://www.costcobusinesscentre.ca/gatorade-perform-club-pack-28--591-ml.product.100282340.html"},
+    {name:"Prime", category:"Beverage", caseCost:null, unitsPerCase:null, unitCost:1.65, sellPrice:4.5},
+    {name:"Fuze", category:"Beverage", caseCost:23.09, unitsPerCase:32, unitCost:0.76, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/fuze-iced-tea-32-x-341-ml.product.2001187569.html"},
+    {name:"Bubly", category:"Beverage", caseCost:21.63, unitsPerCase:32, unitCost:0.74, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/bubly-32--355-ml.product.4201050369.html"},
+    {name:"Peace Tea", category:"Beverage", caseCost:null, unitsPerCase:null, unitCost:1.37, sellPrice:3},
+    {name:"Apple juice", category:"Beverage", caseCost:17.77, unitsPerCase:24, unitCost:0.90, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/oasis-apple-juice-24-x-300-ml.product.2001219897.html"},
+    {name:"Orange juice", category:"Beverage", caseCost:22.67, unitsPerCase:24, unitCost:1.03, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/oasis-orange-juice-24--300-ml.product.100335234.html"},
+    {name:"Grape juice", category:"Beverage", caseCost:16.17, unitsPerCase:24, unitCost:0.86, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/oasis-apple-grape-juice-24--300-ml.product.100394365.html"},
+    {name:"Chocolate milk", category:"Beverage", caseCost:14.51, unitsPerCase:16, unitCost:0.97, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/natrel-chocolate-milk-16--200-ml.product.100294634.html"},
+    {name:"Water", category:"Beverage", caseCost:10.49, unitsPerCase:35, unitCost:0.31, sellPrice:2.25, link:"https://www.costcobusinesscentre.ca/eska-natural-spring-water-35--500-ml.product.2001121356.html"},
+    {name:"Coffee (K-cup)", category:"Beverage", caseCost:51.99, unitsPerCase:120, unitCost:0.42, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/kirkland-signature-organic-pacific-bold-fair-trade-coffee-k-cup-pods-pack-of-120.product.2001153667.html"},
+    // HOT FOOD
+    {name:"Pogo", category:"Hot Food", caseCost:19.09, unitsPerCase:30, unitCost:0.60, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/pogo-corn-dogs-pack-of-30.product.100281517.html"},
     {name:"Pogo (2)", category:"Hot Food", caseCost:17.99, unitCost:1.20, sellPrice:4.5},
-    {name:"Hotdogs w/bun", category:"Hot Food", caseCost:12.59, unitCost:1.06, sellPrice:3},
+    {name:"Hotdogs w/bun", category:"Hot Food", caseCost:null, unitsPerCase:null, unitCost:1.06, sellPrice:3},
     {name:"Hotdogs w/bun (2)", category:"Hot Food", caseCost:12.59, unitCost:2.12, sellPrice:5.5},
-    {name:"Jamaican patty", category:"Hot Food", caseCost:22.99, unitCost:0.96, sellPrice:3},
+    {name:"Jamaican patty", category:"Hot Food", caseCost:24.09, unitsPerCase:24, unitCost:0.96, sellPrice:3, link:"https://www.costcobusinesscentre.ca/patty-king-frozen-jamaican-patties-pack-of-24.product.100319860.html"},
     {name:"Jamaican patty (2)", category:"Hot Food", caseCost:22.99, unitCost:1.92, sellPrice:5},
-    {name:"Pizza slice", category:"Hot Food", caseCost:90.95, unitCost:1.26, sellPrice:3.5},
+    {name:"Pizza slice", category:"Hot Food", caseCost:null, unitsPerCase:null, unitCost:1.26, sellPrice:3.5},
     {name:"Pizza slice (2)", category:"Hot Food", caseCost:90.95, unitCost:2.53, sellPrice:6},
-    {name:"Pizza Whole (Cheese)", category:"Hot Food", caseCost:90.95, unitCost:7.58, sellPrice:16.99},
-    {name:"Pizza Whole (Pep)", category:"Hot Food", caseCost:90.95, unitCost:8.24, sellPrice:16.99},
-    {name:"Sandwich", category:"Healthy", caseCost:2.35, unitCost:2.35, sellPrice:5.99},
-    {name:"Lunch box", category:"Healthy", caseCost:6.57, unitCost:6.57, sellPrice:10},
-    {name:"Fruit and cheese", category:"Healthy", caseCost:3.5, unitCost:3.5, sellPrice:3.99},
-    {name:"Veggies and dip", category:"Healthy", caseCost:3.11, unitCost:3.11, sellPrice:3.99},
-    {name:"Yoghurt and granola", category:"Healthy", caseCost:12.48, unitCost:3.12, sellPrice:3.99},
-    {name:"Mini donuts", category:"Snacks", caseCost:103.33, unitCost:1.32, sellPrice:4},
-    {name:"Cookies", category:"Snacks", caseCost:30.39, unitCost:0.84, sellPrice:2},
-    {name:"Apple sauce", category:"Snacks", caseCost:16.19, unitCost:0.45, sellPrice:2},
-    {name:"Lays", category:"Snacks", caseCost:34.29, unitCost:0.86, sellPrice:2.5},
-    {name:"Doritos", category:"Snacks", caseCost:43.99, unitCost:0.92, sellPrice:2.5},
-    {name:"Mr. Freeze (2025)", category:"Ice Cream", caseCost:19.99, unitCost:0.29, sellPrice:2},
-    {name:"Sandwich (Costco)", category:"Ice Cream", caseCost:14.17, unitCost:0.47, sellPrice:3.5},
-    {name:"Drumstick (2024)", category:"Ice Cream", caseCost:20.19, unitCost:1.12, sellPrice:3.5},
-    {name:"Minion/Spongebob", category:"Ice Cream", caseCost:30.96, unitCost:1.72, sellPrice:2.5},
-    {name:"Cyclone", category:"Ice Cream", caseCost:41.28, unitCost:1.72, sellPrice:2.5},
-    {name:"Klondike", category:"Ice Cream", caseCost:58.19, unitCost:2.42, sellPrice:3.5},
-    {name:"Magnum", category:"Ice Cream", caseCost:43.36, unitCost:3.61, sellPrice:4.5},
-    {name:"Haagen-Daz", category:"Ice Cream", caseCost:19.15, unitCost:2.12, sellPrice:4.5},
-    {name:"Kitkat", category:"Ice Cream", caseCost:21.39, unitCost:1.02, sellPrice:3.5},
-    {name:"Combo (hotdog)", category:"Ice Cream", caseCost:3.73, unitCost:3.73, sellPrice:10},
+    {name:"Pizza Whole (Cheese)", category:"Hot Food", caseCost:17.39, unitsPerCase:4, unitCost:7.58, sellPrice:16.99, link:"https://www.costcobusinesscentre.ca/kirkland-signature-frozen-cheese-pizza-pack-of-4.product.100282680.html"},
+    {name:"Pizza Whole (Pep)", category:"Hot Food", caseCost:21.79, unitsPerCase:4, unitCost:8.24, sellPrice:16.99, link:"https://www.costcobusinesscentre.ca/kirkland-signature-pepperoni-thin-crust-pizza-4-x-555-g.product.100419209.html"},
+    // HEALTHY
+    {name:"Sandwich", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:2.35, sellPrice:5.99},
+    {name:"Lunch box", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:6.57, sellPrice:10},
+    {name:"Fruit and cheese", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:3.5, sellPrice:3.99},
+    {name:"Veggies and dip", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:3.11, sellPrice:3.99},
+    {name:"Yoghurt and granola", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:3.12, sellPrice:3.99},
+    // SNACKS
+    {name:"Mini donuts", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:1.32, sellPrice:4},
+    {name:"Cookies", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:0.84, sellPrice:2},
+    {name:"Apple sauce", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:0.45, sellPrice:2},
+    {name:"Lays", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:0.86, sellPrice:2.5},
+    {name:"Doritos", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:0.92, sellPrice:2.5},
+    // ICE CREAM
+    {name:"Mr. Freeze (2025)", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:0.29, sellPrice:2},
+    {name:"Sandwich (Costco)", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:0.47, sellPrice:3.5},
+    {name:"Drumstick (2024)", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:1.12, sellPrice:3.5},
+    {name:"Minion/Spongebob", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:1.72, sellPrice:2.5},
+    {name:"Cyclone", category:"Ice Cream", caseCost:16.69, unitsPerCase:24, unitCost:1.72, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/popsicle-cyclone-24-x-80ml.product.4201076472.html"},
+    {name:"Klondike", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:2.42, sellPrice:3.5},
+    {name:"Magnum", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:3.61, sellPrice:4.5},
+    {name:"Haagen-Daz", category:"Ice Cream", caseCost:13.09, unitsPerCase:9, unitCost:2.12, sellPrice:4.5, link:"https://www.costcobusinesscentre.ca/hagen-dazs-vanilla-almond-ice-cream-bars-9--88-ml.product.100314467.html"},
+    {name:"Kitkat", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:1.02, sellPrice:3.5},
+    {name:"Combo (hotdog)", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:3.73, sellPrice:10},
   ];
-  return seed.map((p, i) => ({id: genId(), country:"CAN", unitsPerCase: null, ...p}));
+  return seed.map((p, i) => ({id: genId(), country:"CAN", unitsPerCase: null, link: null, ...p}));
 }
 
 function genId(){
@@ -1101,16 +1120,25 @@ function marginClass(pct){
   return "m-bad";
 }
 
+// Quebec charges a 10¢ deposit on most beverage bottles/cans. This is added
+// automatically to Unit Cost (not the raw Case Cost, which stays as the true
+// supplier price you'd see on the Costco listing) for anything in the
+// Beverage category once both Case Cost and # per Case are filled in.
+const QC_BOTTLE_DEPOSIT = 0.10;
+
 function applyAutoUnitCost(p){
   const cc = p.caseCost;
   const upc = p.unitsPerCase;
   const hasCC = cc !== null && cc !== undefined && !isNaN(cc);
   const hasUPC = upc !== null && upc !== undefined && !isNaN(upc) && upc > 0;
   if(hasCC && hasUPC){
-    p.unitCost = Math.round((cc / upc) * 100) / 100;
+    const deposit = p.category === "Beverage" ? QC_BOTTLE_DEPOSIT : 0;
+    p.unitCost = Math.round(((cc / upc) + deposit) * 100) / 100;
     p.autoUnitCost = true;
+    p.depositApplied = deposit > 0;
   } else {
     p.autoUnitCost = false;
+    p.depositApplied = false;
   }
 }
 function recalcAllAutoUnitCosts(){
@@ -1250,6 +1278,7 @@ function renderTableSection(){
         <tr>
           <th data-key="category">Category</th>
           <th data-key="name">Product</th>
+          <th>Link</th>
           <th class="num" data-key="caseCost">Case Cost</th>
           <th class="num" data-key="unitsPerCase"># / Case</th>
           <th class="num" data-key="unitCost">Unit Cost</th>
@@ -1272,12 +1301,21 @@ function renderTableSection(){
 
   list.forEach(p => {
     const tr = document.createElement("tr");
-    const unitCostTitle = p.autoUnitCost ? 'title="Auto-calculated: Case Cost ÷ # per Case"' : "";
+    const unitCostTitle = p.autoUnitCost
+      ? (p.depositApplied
+          ? 'title="Auto-calculated: (Case Cost ÷ # per Case) + $0.10 QC bottle/can deposit"'
+          : 'title="Auto-calculated: Case Cost ÷ # per Case"')
+      : "";
+    const linkIcon = p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" class="product-link-icon">🔗 open</a>` : "";
 
     if(editMode){
       tr.innerHTML = `
         <td><span class="cat-pill">${p.category}</span></td>
-        <td class="editable name-cell"><input type="text" value="${escapeHtml(p.name)}" data-id="${p.id}" data-field="name"></td>
+        <td class="editable name-cell">
+          <input type="text" value="${escapeHtml(p.name)}" data-id="${p.id}" data-field="name">
+          ${linkIcon}
+        </td>
+        <td class="editable link-cell"><input type="text" value="${escapeHtml(p.link ?? "")}" placeholder="https://..." data-id="${p.id}" data-field="link"></td>
         <td class="num editable"><input type="number" step="0.01" value="${p.caseCost ?? ""}" placeholder="—" data-id="${p.id}" data-field="caseCost"></td>
         <td class="num editable"><input type="number" step="1" min="1" value="${p.unitsPerCase ?? ""}" placeholder="—" data-id="${p.id}" data-field="unitsPerCase"></td>
         <td class="num editable"><input type="number" step="0.01" value="${p.unitCost}" data-id="${p.id}" data-field="unitCost" class="${p.autoUnitCost ? "auto-calc" : ""}" ${p.autoUnitCost ? "readonly" : ""} ${unitCostTitle}></td>
@@ -1293,10 +1331,11 @@ function renderTableSection(){
     } else {
       tr.innerHTML = `
         <td><span class="cat-pill">${p.category}</span></td>
-        <td class="readonly-cell name-cell">${escapeHtml(p.name)}</td>
+        <td class="readonly-cell name-cell">${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" style="color:#fff;">${escapeHtml(p.name)}</a>` : escapeHtml(p.name)}</td>
+        <td class="readonly-cell">${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" class="product-link-icon">🔗 open</a>` : `<span class="link-empty">—</span>`}</td>
         <td class="num readonly-cell">${p.caseCost !== null && p.caseCost !== undefined ? fmtMoney(p.caseCost) : "—"}</td>
         <td class="num readonly-cell">${p.unitsPerCase ?? "—"}</td>
-        <td class="num readonly-cell">${fmtMoney(p.unitCost)}</td>
+        <td class="num readonly-cell">${fmtMoney(p.unitCost)}${p.depositApplied ? ' <span class="deposit-mark" title="Includes $0.10 QC bottle/can deposit">†</span>' : ""}</td>
         <td class="num readonly-cell">${fmtMoney(p.sellPrice)}</td>
         <td class="num">${fmtMoney(p.dollar)}</td>
         <td class="num"><span class="margin-badge ${marginClass(p.pct)}">${fmtPct(p.pct)}</span></td>
@@ -1343,6 +1382,9 @@ function onFieldChange(e){
   if(!p) return;
   if(field === "name"){
     p.name = e.target.value;
+  } else if(field === "link"){
+    const v = e.target.value.trim();
+    p.link = v === "" ? null : v;
   } else if(field === "caseCost" || field === "unitsPerCase"){
     const v = e.target.value === "" ? null : parseFloat(e.target.value);
     p[field] = (v === null || isNaN(v)) ? null : v;
@@ -1386,6 +1428,7 @@ document.getElementById("addBtn").addEventListener("click", () => {
   const unitsPerCaseRaw = document.getElementById("newUnitsPerCase").value;
   const unitCost = parseFloat(document.getElementById("newUnitCost").value);
   const sellPrice = parseFloat(document.getElementById("newSellPrice").value);
+  const linkRaw = document.getElementById("newLink").value.trim();
 
   if(!name || isNaN(unitCost) || isNaN(sellPrice)){
     showMessageModal("Missing info", "Please enter at least a name, unit cost, and sell price. (Unit cost fills in automatically if you enter both Case Cost and # per Case.)");
@@ -1398,7 +1441,8 @@ document.getElementById("addBtn").addEventListener("click", () => {
     name, category,
     caseCost: caseCostRaw === "" ? null : parseFloat(caseCostRaw),
     unitsPerCase: unitsPerCaseRaw === "" ? null : parseFloat(unitsPerCaseRaw),
-    unitCost, sellPrice
+    unitCost, sellPrice,
+    link: linkRaw === "" ? null : linkRaw
   });
 
   document.getElementById("newName").value = "";
@@ -1408,6 +1452,7 @@ document.getElementById("addBtn").addEventListener("click", () => {
   document.getElementById("newUnitCost").value = "";
   document.getElementById("newUnitCost").readOnly = false;
   document.getElementById("newSellPrice").value = "";
+  document.getElementById("newLink").value = "";
 
   renderAll();
   saveProducts();
@@ -1426,12 +1471,16 @@ function parseImportRows(raw){
     const delim = line.includes("\t") ? "\t" : ",";
     const parts = line.split(delim).map(s => s.trim().replace(/^"|"$/g, ""));
 
-    let category, name, caseCostRaw, unitsPerCaseRaw, unitCostRaw, sellPriceRaw;
-    if(parts.length >= 6){
+    let category, name, caseCostRaw, unitsPerCaseRaw, unitCostRaw, sellPriceRaw, linkRaw;
+    if(parts.length >= 7){
+      [category, name, caseCostRaw, unitsPerCaseRaw, unitCostRaw, sellPriceRaw, linkRaw] = parts;
+    } else if(parts.length === 6){
       [category, name, caseCostRaw, unitsPerCaseRaw, unitCostRaw, sellPriceRaw] = parts;
+      linkRaw = "";
     } else if(parts.length === 5){
       [category, name, caseCostRaw, unitCostRaw, sellPriceRaw] = parts;
       unitsPerCaseRaw = "";
+      linkRaw = "";
     } else {
       skipped.push(line); return;
     }
@@ -1441,6 +1490,7 @@ function parseImportRows(raw){
     const caseCost = (caseCostParsed === null || isNaN(caseCostParsed)) ? null : caseCostParsed;
     const unitsPerCaseParsed = unitsPerCaseRaw === "" || unitsPerCaseRaw === undefined ? null : parseFloat(unitsPerCaseRaw);
     const unitsPerCase = (unitsPerCaseParsed === null || isNaN(unitsPerCaseParsed)) ? null : unitsPerCaseParsed;
+    const link = (linkRaw && linkRaw.trim() !== "") ? linkRaw.trim() : null;
 
     let unitCost = unitCostRaw === "" || unitCostRaw === undefined ? NaN : parseFloat(unitCostRaw);
     const canAutoCalc = caseCost !== null && unitsPerCase !== null && unitsPerCase > 0;
@@ -1455,7 +1505,8 @@ function parseImportRows(raw){
       name,
       caseCost,
       unitsPerCase,
-      unitCost, sellPrice
+      unitCost, sellPrice,
+      link
     });
   });
   return {rows, skipped};
@@ -1496,7 +1547,7 @@ document.getElementById("importConfirmBtn").addEventListener("click", () => {
   if(!editMode) return;
   const {rows} = parseImportRows(importText.value);
   if(!rows.length){
-    showMessageModal("No valid rows", "Check the format: <code>Category, Name, Case Cost, # per Case, Unit Cost, Sell Price</code>");
+    showMessageModal("No valid rows", "Check the format: <code>Category, Name, Case Cost, # per Case, Unit Cost, Sell Price, Link</code>");
     return;
   }
   rows.forEach(r => {
@@ -1517,7 +1568,7 @@ document.getElementById("importConfirmBtn").addEventListener("click", () => {
 });
 
 document.getElementById("exportBtn").addEventListener("click", () => {
-  const rows = [["Country","Category","Product","Case Cost","# per Case","Unit Cost","Sell Price","Margin $","Margin %"]];
+  const rows = [["Country","Category","Product","Case Cost","# per Case","Unit Cost","Sell Price","Margin $","Margin %","Link"]];
   countryProducts().forEach(p => {
     const {dollar, pct} = computeMargin(p);
     rows.push([
@@ -1525,7 +1576,8 @@ document.getElementById("exportBtn").addEventListener("click", () => {
       p.caseCost ?? "",
       p.unitsPerCase ?? "",
       p.unitCost, p.sellPrice,
-      dollar.toFixed(2), (pct*100).toFixed(1) + "%"
+      dollar.toFixed(2), (pct*100).toFixed(1) + "%",
+      p.link ?? ""
     ]);
   });
   const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
