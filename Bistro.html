@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ninja Kidz Margin Dashboard</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --ink:#e8f0ff;
+    --paper:#060a14;
+    --panel:#0a1226;
+    --panel-alt:#0d1730;
+    --line:#1a2b4d;
+    --slate:#8fb4e8;
+    --slate-soft:#6f88b5;
+    --blue:#1a4fd6;
+    --cyan:#3ec1ff;
+    --good:#4ade80;
+    --good-bg:rgba(74,222,128,0.12);
+    --warn:#facc15;
+    --warn-bg:rgba(250,204,21,0.12);
+    --bad:#f87171;
+    --bad-bg:rgba(248,113,113,0.14);
+    --radius:10px;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
+    --display: Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:radial-gradient(ellipse at top, #0d1730 0%, #060a14 60%, #030509 100%);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:60px;
+  }
+
+  header.top{
+    background:linear-gradient(180deg, #0a1226, #060b18);
+    color:#f2efe6;
+    padding:20px 32px 24px;
+    border-bottom:2px solid var(--blue);
+    box-shadow:0 2px 20px rgba(30,110,255,0.35);
+  }
+  .header-row{
+    display:flex;
+    align-items:center;
+    gap:18px;
+  }
+  .logo-wrap{display:flex; align-items:center; gap:10px;}
+  .ninja-icon{width:36px; height:36px; flex-shrink:0;}
+  .ninja-icon svg{width:100%; height:100%; filter:drop-shadow(0 0 6px #3ec1ff);}
+  .logo-text{
+    font-style:italic;
+    font-weight:900;
+    font-size:22px;
+    letter-spacing:.5px;
+    color:#fff;
+    text-shadow:0 0 8px rgba(62,193,255,.9), 0 0 18px rgba(30,110,255,.6);
+    transform:skewX(-6deg);
+    line-height:1;
+    text-transform:uppercase;
+    font-family:var(--display);
+  }
+  .logo-text span{color:var(--cyan);}
+  .action-park-badge{
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:1.5px;
+    background:linear-gradient(90deg,var(--blue),var(--cyan));
+    color:#fff;
+    padding:2px 8px;
+    border-radius:3px;
+    margin-top:2px;
+    display:inline-block;
+    transform:skewX(-6deg);
+  }
+  .divider-line{width:1px; height:34px; background:linear-gradient(180deg,transparent,#2a4a8a,transparent);}
+  .header-titles{margin-left:2px;}
+  .header-titles .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--slate-soft);
+    margin-bottom:4px;
+  }
+  .header-titles h1{
+    font-family:var(--display);
+    font-style:italic;
+    font-weight:900;
+    font-size:26px;
+    margin:0;
+    letter-spacing:.5px;
+    color:#fff;
+    text-transform:uppercase;
+    text-shadow:0 0 10px rgba(62,193,255,0.35);
+    transform:skewX(-3deg);
+  }
+  .header-titles p.sub{
+    margin:6px 0 0;
+    color:var(--slate-soft);
+    font-size:13px;
+    max-width:560px;
+  }
+
+  .country-toggle{
+    margin-left:auto;
+    display:flex;
+    background:#0a1226;
+    border:1px solid var(--blue);
+    border-radius:8px;
+    overflow:hidden;
+    box-shadow:0 0 12px rgba(30,110,255,0.25);
+    flex-shrink:0;
+  }
+  .country-toggle button{
+    border:none;
+    background:transparent;
+    color:#7d96c4;
+    font-weight:800;
+    letter-spacing:1px;
+    font-size:12px;
+    padding:10px 18px;
+    cursor:pointer;
+    transition:all .2s ease;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .country-toggle button.active{
+    background:linear-gradient(90deg,var(--blue),var(--cyan));
+    color:#fff;
+  }
+  .country-toggle button:not(.active):hover{
+    background:rgba(62,193,255,0.08);
+    color:#cfe2ff;
+  }
+
+  .wrap{max-width:1180px; margin:0 auto; padding:0 32px;}
+
+  .sync-row{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:8px;
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--slate-soft);
+    flex-wrap:wrap;
+  }
+  .sync-dot{
+    width:7px; height:7px;
+    border-radius:50%;
+    display:inline-block;
+    margin-right:5px;
+    background:var(--slate-soft);
+  }
+  .sync-dot.synced{background:var(--good); box-shadow:0 0 6px rgba(74,222,128,0.7);}
+  .sync-dot.saving, .sync-dot.loading{background:var(--warn); box-shadow:0 0 6px rgba(250,204,21,0.7); animation:pulse 1s infinite;}
+  .sync-dot.error{background:var(--bad); box-shadow:0 0 6px rgba(248,113,113,0.7);}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+  .refresh-link{
+    color:var(--cyan);
+    cursor:pointer;
+    text-decoration:none;
+    font-weight:700;
+  }
+  .refresh-link:hover{text-decoration:underline;}
+
+  .mode-badge{
+    font-family:var(--mono);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.5px;
+    padding:5px 12px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .mode-badge.view{color:var(--slate); background:var(--panel-alt);}
+  .mode-badge.edit{color:#fff; background:linear-gradient(90deg,var(--blue),var(--cyan)); border-color:var(--cyan);}
+  .mode-badge:hover{filter:brightness(1.1);}
+
+  .view-only-banner{
+    margin-top:14px;
+    background:rgba(62,193,255,0.06);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 14px;
+    font-size:12.5px;
+    color:var(--slate);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .view-only-banner b{color:#fff;}
+
+  .summary{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(180px,1fr));
+    gap:14px;
+    margin-top:14px;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px 18px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.35), 0 0 20px rgba(30,110,255,0.06);
+  }
+  .card .label{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--slate-soft);
+    margin-bottom:8px;
+  }
+  .card .value{
+    font-family:var(--display);
+    font-weight:900;
+    font-style:italic;
+    font-size:24px;
+    color:#fff;
+    line-height:1.1;
+  }
+  .card .value.copper{color:var(--cyan); text-shadow:0 0 10px rgba(62,193,255,0.5);}
+  .card .sub{font-size:12px; color:var(--slate-soft); margin-top:4px;}
+
+  .controls{
+    margin-top:26px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .controls .left{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .controls .right{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+
+  input[type="text"], input[type="number"], input[type="password"], select{
+    font-family:var(--sans);
+    font-size:13.5px;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    background:var(--panel-alt);
+    color:var(--ink);
+  }
+  input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus, select:focus{
+    outline:2px solid var(--cyan);
+    outline-offset:1px;
+  }
+  #search{width:220px;}
+
+  .chip{
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:.02em;
+    padding:6px 12px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:var(--panel-alt);
+    color:var(--slate);
+    cursor:pointer;
+    user-select:none;
+  }
+  .chip.active{
+    background:linear-gradient(90deg,var(--blue),var(--cyan));
+    color:#fff;
+    border-color:var(--cyan);
+  }
+
+  .btn{
+    font-family:var(--sans);
+    font-size:13px;
+    font-weight:700;
+    padding:9px 16px;
+    border-radius:7px;
+    border:1px solid transparent;
+    cursor:pointer;
+  }
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
+  .btn-primary{background:linear-gradient(90deg,var(--blue),var(--cyan)); color:#fff;}
+  .btn-primary:hover{filter:brightness(1.1);}
+  .btn-ghost{background:transparent; border-color:var(--line); color:var(--slate);}
+  .btn-ghost:hover{border-color:var(--cyan); color:var(--cyan);}
+  .btn-danger{background:transparent; color:var(--bad); border-color:transparent;}
+  .btn-danger:hover{text-decoration:underline;}
+
+  .threshold-box{
+    display:flex; align-items:center; gap:6px;
+    font-size:12.5px; color:var(--slate-soft);
+    font-family:var(--mono);
+  }
+  .threshold-box input{width:64px;}
+
+  table.data{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:16px;
+    background:var(--panel);
+    border-radius:var(--radius);
+    overflow:hidden;
+    box-shadow:0 6px 18px rgba(0,0,0,0.35), 0 0 20px rgba(30,110,255,0.06);
+  }
+  table.data thead th{
+    text-align:left;
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--slate-soft);
+    background:var(--panel-alt);
+    padding:11px 12px;
+    border-bottom:2px solid var(--blue);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  table.data thead th:hover{color:var(--cyan);}
+  table.data thead th.sorted{color:var(--cyan);}
+  table.data thead th.sorted::after{content:" \25BE";}
+  table.data tbody td{
+    padding:9px 12px;
+    border-bottom:1px solid var(--line);
+    font-size:13.5px;
+    vertical-align:middle;
+  }
+  table.data tbody tr:last-child td{border-bottom:none;}
+  table.data tbody tr:hover{background:rgba(62,193,255,0.06);}
+  td.num, th.num{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums;}
+  td.editable{position:relative;}
+  td.editable input{
+    width:100%;
+    border:1px solid transparent;
+    background:transparent;
+    font-family:var(--mono);
+    font-size:13.5px;
+    padding:4px 6px;
+    border-radius:5px;
+    text-align:right;
+    color:var(--ink);
+  }
+  td.editable.name-cell input{
+    font-family:var(--sans);
+    text-align:left;
+    color:#fff;
+    font-weight:600;
+  }
+  td.editable input:hover{border-color:var(--line);}
+  td.editable input:focus{border-color:var(--cyan); outline:none; background:#0d1730;}
+  td.editable input.auto-calc{
+    color:var(--cyan);
+    background:rgba(62,193,255,0.07);
+    cursor:not-allowed;
+    font-weight:700;
+  }
+  td.editable input.auto-calc:hover{border-color:transparent;}
+  td.readonly-cell{color:var(--ink); font-family:var(--mono);}
+  td.readonly-cell.name-cell{font-family:var(--sans); color:#fff; font-weight:600; text-align:left;}
+
+  .cat-pill{
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+    padding:3px 8px;
+    border-radius:5px;
+    background:var(--panel-alt);
+    color:var(--slate);
+    white-space:nowrap;
+    border:1px solid var(--line);
+  }
+
+  .margin-badge{
+    display:inline-block;
+    min-width:64px;
+    text-align:center;
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:13px;
+    padding:4px 8px;
+    border-radius:6px;
+  }
+  .m-good{background:var(--good-bg); color:var(--good);}
+  .m-warn{background:var(--warn-bg); color:var(--warn);}
+  .m-bad{background:var(--bad-bg); color:var(--bad);}
+
+  .row-actions{display:flex; gap:10px;}
+  .row-actions button{
+    background:none; border:none; cursor:pointer;
+    font-size:12px; color:var(--slate-soft);
+    font-family:var(--mono);
+  }
+  .row-actions button:hover{color:var(--bad);}
+
+  .empty{
+    text-align:center;
+    padding:40px 20px;
+    color:var(--slate-soft);
+    font-size:13.5px;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:70px 20px;
+    background:var(--panel);
+    border-radius:var(--radius);
+    border:1px dashed var(--line);
+    margin-top:16px;
+  }
+  .empty-state .icon{width:56px; height:56px; margin:0 auto 16px; opacity:.7;}
+  .empty-state .icon svg{width:100%; height:100%; filter:drop-shadow(0 0 6px #3ec1ff);}
+  .empty-state h3{
+    font-family:var(--display);
+    font-style:italic;
+    font-weight:900;
+    text-transform:uppercase;
+    font-size:19px;
+    color:#fff;
+    letter-spacing:.5px;
+    margin-bottom:8px;
+    transform:skewX(-3deg);
+  }
+  .empty-state p{
+    color:var(--slate-soft);
+    font-size:13.5px;
+    max-width:400px;
+    margin:0 auto;
+    line-height:1.6;
+  }
+  .empty-badge{
+    display:inline-block;
+    margin-top:16px;
+    background:rgba(62,193,255,0.1);
+    border:1px solid var(--line);
+    color:var(--slate);
+    font-size:11px;
+    letter-spacing:1px;
+    padding:6px 14px;
+    border-radius:20px;
+    font-weight:700;
+  }
+
+  .add-panel{
+    margin-top:18px;
+    background:var(--panel);
+    border:1px dashed var(--line);
+    border-radius:var(--radius);
+    padding:16px 18px;
+  }
+  .add-panel h3{
+    margin:0 0 4px;
+    font-family:var(--display);
+    font-style:italic;
+    font-weight:900;
+    font-size:16px;
+    color:#fff;
+    text-transform:uppercase;
+  }
+  .add-panel .add-note{
+    font-size:11.5px;
+    color:var(--slate-soft);
+    margin-bottom:12px;
+    font-family:var(--mono);
+  }
+  .add-panel .add-note b{color:var(--cyan);}
+  .add-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+    gap:10px;
+    align-items:end;
+  }
+  .add-grid .add-btn-cell{ grid-column: 1 / -1; display:flex; justify-content:flex-end; }
+  .product-link-icon{
+    color:var(--cyan);
+    text-decoration:none;
+    font-size:12px;
+    margin-left:6px;
+    white-space:nowrap;
+  }
+  .product-link-icon:hover{ text-decoration:underline; }
+  .link-cell input{ text-align:left; }
+  .link-empty{ color:var(--slate-soft); font-size:12px; }
+  .deposit-mark{
+    color:var(--cyan);
+    font-size:11px;
+    cursor:help;
+    margin-left:2px;
+  }
+  .add-grid label{
+    display:block;
+    font-family:var(--mono);
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--slate-soft);
+    margin-bottom:4px;
+  }
+  .add-grid input, .add-grid select{width:100%;}
+  .add-grid input[readonly]{
+    color:var(--cyan);
+    background:rgba(62,193,255,0.07);
+    font-weight:700;
+  }
+
+  .import-panel{
+    margin-top:18px;
+    background:var(--panel);
+    border:1px solid var(--cyan);
+    border-radius:var(--radius);
+    padding:16px 18px;
+    box-shadow:0 0 20px rgba(62,193,255,0.12);
+  }
+  .import-panel h3{
+    margin:0 0 8px;
+    font-family:var(--display);
+    font-style:italic;
+    font-weight:900;
+    font-size:16px;
+    color:#fff;
+    text-transform:uppercase;
+  }
+  .import-target{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--cyan);
+    text-transform:none;
+    font-style:normal;
+    font-weight:700;
+    margin-left:6px;
+  }
+  .import-help{
+    font-size:12px;
+    color:var(--slate-soft);
+    line-height:1.6;
+    margin-bottom:10px;
+  }
+  .import-help code{
+    font-family:var(--mono);
+    background:var(--panel-alt);
+    padding:1px 5px;
+    border-radius:4px;
+    color:var(--cyan);
+  }
+  #importText{
+    width:100%;
+    min-height:110px;
+    background:var(--panel-alt);
+    border:1px solid var(--line);
+    border-radius:7px;
+    color:var(--ink);
+    font-family:var(--mono);
+    font-size:12.5px;
+    padding:10px;
+    resize:vertical;
+  }
+  #importText:focus{outline:2px solid var(--cyan); outline-offset:1px;}
+  .import-actions{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:10px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .import-preview{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--slate-soft);
+  }
+  .import-preview .ok{color:var(--good);}
+  .import-preview .warn{color:var(--warn);}
+
+  footer.note{
+    max-width:1180px;
+    margin:26px auto 0;
+    padding:0 32px;
+    font-size:12px;
+    color:var(--slate-soft);
+  }
+
+  .modal-overlay{
+    position:fixed; inset:0;
+    background:rgba(3,5,9,0.72);
+    backdrop-filter:blur(2px);
+    display:flex; align-items:center; justify-content:center;
+    z-index:1000;
+    padding:20px;
+  }
+  .modal-box{
+    background:var(--panel);
+    border:1px solid var(--blue);
+    border-radius:12px;
+    padding:22px 24px;
+    max-width:440px;
+    width:100%;
+    box-shadow:0 10px 40px rgba(0,0,0,0.5), 0 0 30px rgba(62,193,255,0.15);
+  }
+  .modal-box h3{
+    margin:0 0 6px;
+    font-family:var(--display);
+    font-style:italic;
+    font-weight:900;
+    font-size:18px;
+    color:#fff;
+    text-transform:uppercase;
+    transform:skewX(-3deg);
+  }
+  .modal-box p{
+    font-size:13.5px;
+    color:var(--slate-soft);
+    line-height:1.6;
+    margin:0 0 14px;
+  }
+  .modal-box input[type="password"], .modal-box input[type="text"]{
+    width:100%;
+    margin-bottom:8px;
+  }
+  .modal-error{
+    color:var(--bad);
+    font-size:12.5px;
+    font-family:var(--mono);
+    min-height:16px;
+    margin-bottom:6px;
+  }
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:14px;
+  }
+  .modal-box textarea.export-area{
+    width:100%;
+    min-height:200px;
+    background:var(--panel-alt);
+    border:1px solid var(--line);
+    border-radius:7px;
+    color:var(--ink);
+    font-family:var(--mono);
+    font-size:11.5px;
+    padding:10px;
+    resize:vertical;
+  }
+  .copy-status{
+    font-size:12px;
+    font-family:var(--mono);
+    color:var(--good);
+    margin-top:6px;
+    min-height:16px;
+  }
+
+  @media (max-width:760px){
+    .add-grid{grid-template-columns:1fr 1fr;}
+    header.top{padding:18px 18px 20px;}
+    .wrap{padding:0 16px;}
+    footer.note{padding:0 16px;}
+    table.data{font-size:12px;}
+    .header-row{flex-wrap:wrap;}
+    .country-toggle{margin-left:0;}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap" style="padding:0;">
+    <div class="header-row">
+      <div class="logo-wrap">
+        <div class="ninja-icon">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <path d="M50 8 L88 30 L88 70 L50 92 L12 70 L12 30 Z" fill="#0d1730" stroke="#3ec1ff" stroke-width="4"/>
+            <path d="M30 45 Q50 30 70 45" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <circle cx="38" cy="48" r="4" fill="#fff"/>
+            <circle cx="62" cy="48" r="4" fill="#fff"/>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-text">NINJA <span>KIDZ</span></div>
+          <div class="action-park-badge">ACTION PARK</div>
+        </div>
+      </div>
+      <div class="divider-line"></div>
+      <div class="header-titles">
+        <div class="eyebrow">Kitchen &amp; Counter · Margin Control</div>
+        <h1>Margin Dashboard</h1>
+        <p class="sub">Track cost, price, and profitability across the menu. Staff can edit live; everyone else views read-only.</p>
+      </div>
+      <div class="country-toggle">
+        <button id="btn-can" class="active" onclick="setCountry('CAN')">🇨🇦 CANADA</button>
+        <button id="btn-us" onclick="setCountry('US')">🇺🇸 US</button>
+      </div>
+    </div>
+    <div class="sync-row">
+      <span class="mode-badge view" id="modeBadge">🔒 View Only — Staff Login</span>
+      <span class="refresh-link" id="refreshBtn">↻ Refresh</span>
+      &nbsp;·&nbsp;
+      <span><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Connecting…</span></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="view-only-banner" id="viewOnlyBanner">
+    <span>You're viewing in <b>read-only mode</b>. Anyone with this link can see live prices and margins. Only staff with the password can add, edit, or remove products.</span>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="controls">
+    <div class="left" id="categoryChips"></div>
+    <div class="right">
+      <input type="text" id="search" placeholder="Search products…">
+      <div class="threshold-box">
+        Target margin
+        <input type="number" id="threshold" value="60" min="0" max="100" step="1">%
+      </div>
+      <button class="btn btn-ghost" id="importBtn" style="display:none;">Import Products</button>
+      <button class="btn btn-ghost" id="exportBtn">Export CSV</button>
+    </div>
+  </div>
+
+  <div class="import-panel" id="importPanel" style="display:none;">
+    <h3>Import products <span id="importTargetLabel" class="import-target">→ Canada</span></h3>
+    <p class="import-help">
+      Paste rows copied from Excel/Sheets or a CSV. One product per line, columns in this order:<br>
+      <code>Category, Name, Case Cost, # per Case, Unit Cost, Sell Price, Link</code><br>
+      Case Cost, # per Case, Unit Cost, and Link may all be left blank individually — but if Case Cost and # per Case are both filled in, Unit Cost is calculated automatically (plus a $0.10 deposit for Beverage items) and any value you paste there is ignored. Works with commas or tabs. Older 5 or 6-column lists still work fine. A header row is skipped automatically.
+    </p>
+    <textarea id="importText" placeholder="Candy, Skittles, 46.49, 36, , 3.00, https://www.costcobusinesscentre.ca/skittles-original-candy
+Beverage, Coke/Sprite/Zero, 22.79, 32, , 2.50,
+Hot Food, Pogo, 19.09, 30, , 2.50, https://www.costcobusinesscentre.ca/pogo-corn-dogs"></textarea>
+    <div class="import-actions">
+      <div id="importPreview" class="import-preview"></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost" id="importCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="importConfirmBtn">Import rows</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tableSection"></div>
+
+  <div class="add-panel" id="addPanel" style="display:none;">
+    <h3>Add a product</h3>
+    <div class="add-note">Adding to: <b id="addTargetLabel">Canada</b></div>
+    <div class="add-grid">
+      <div>
+        <label>Name</label>
+        <input type="text" id="newName" placeholder="e.g. Butter Croissant">
+      </div>
+      <div>
+        <label>Category</label>
+        <input type="text" id="newCategory" placeholder="e.g. Pastry" list="catList">
+        <datalist id="catList"></datalist>
+      </div>
+      <div>
+        <label>Case cost ($)</label>
+        <input type="number" id="newCaseCost" step="0.01" placeholder="optional">
+      </div>
+      <div>
+        <label># per case</label>
+        <input type="number" id="newUnitsPerCase" step="1" min="1" placeholder="optional">
+      </div>
+      <div>
+        <label>Unit cost ($)</label>
+        <input type="number" id="newUnitCost" step="0.01">
+      </div>
+      <div>
+        <label>Sell price ($)</label>
+        <input type="number" id="newSellPrice" step="0.01">
+      </div>
+      <div>
+        <label>Product link (optional)</label>
+        <input type="text" id="newLink" placeholder="https://...">
+      </div>
+      <div class="add-btn-cell">
+        <button class="btn btn-primary" id="addBtn">Add product</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="note">
+  Margin % = (Sell price − Unit cost) ⁄ Sell price. Case cost is informational unless paired with # per case, in which case Unit cost = Case cost ÷ # per case, calculated automatically — and for anything in the Beverage category, a $0.10 Quebec bottle/can deposit is added on top automatically (marked with † in the table). This is a shared live document — anyone with the link can view it; staff who enter the password can edit it, and changes sync live for everyone.
+</footer>
+
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+  <div class="modal-box" id="modalBox"></div>
+</div>
+
+<script>
+// ---------- Storage: Firebase Firestore ----------
+//
+// >>> REPLACE THIS with the config Firebase gave you when you registered your web app <
+const firebaseConfig = {
+  apiKey: "AIzaSyCiCr_i8Dl5JtkfNfrVVvtSDgrTqSKzw74",
+  authDomain: "food-and-beverage-margins.firebaseapp.com",
+  projectId: "food-and-beverage-margins",
+  storageBucket: "food-and-beverage-margins.firebasestorage.app",
+  messagingSenderId: "172869723369",
+  appId: "1:172869723369:web:98077b975ce5ed6016bc78",
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const productsDocRef = db.collection("ninjaKidz").doc("products");
+
+const syncDot = document.getElementById("syncDot");
+const syncLabel = document.getElementById("syncLabel");
+let firestoreReady = false;
+
+function setSyncState(state){
+  syncDot.className = "sync-dot " + state;
+  const labels = {
+    loading: "Loading…",
+    saving: "Saving…",
+    synced: "Live",
+    error: "Sync error — check Firebase config"
+  };
+  syncLabel.textContent = labels[state] || state;
+}
+
+async function saveProducts(){
+  setSyncState("saving");
+  try{
+    await productsDocRef.set({
+      products: products,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch(err){
+    console.error("Save failed:", err);
+    setSyncState("error");
+  }
+}
+
+function startLiveSync(){
+  setSyncState("loading");
+  productsDocRef.onSnapshot(
+    (doc) => {
+      if(doc.exists && doc.data().products){
+        products = doc.data().products;
+        setSyncState("synced");
+        renderAll();
+      } else if(!firestoreReady){
+        firestoreReady = true;
+        products = defaultSeedProducts();
+        saveProducts();
+      }
+      firestoreReady = true;
+    },
+    (err) => {
+      console.error("Live sync error:", err);
+      setSyncState("error");
+      if(products.length === 0){
+        products = defaultSeedProducts();
+        renderAll();
+      }
+    }
+  );
+}
+
+document.getElementById("refreshBtn").addEventListener("click", () => {
+  productsDocRef.get().then(doc => {
+    if(doc.exists && doc.data().products){
+      products = doc.data().products;
+      setSyncState("synced");
+      renderAll();
+    }
+  }).catch(err => {
+    console.error("Manual refresh failed:", err);
+    setSyncState("error");
+  });
+});
+
+// ---------- Modal system ----------
+const modalOverlay = document.getElementById("modalOverlay");
+const modalBox = document.getElementById("modalBox");
+
+function closeModal(){
+  modalOverlay.style.display = "none";
+  modalBox.innerHTML = "";
+}
+
+function showMessageModal(title, message){
+  modalBox.innerHTML = `
+    <h3>${title}</h3>
+    <p>${message}</p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="modalOkBtn">OK</button>
+    </div>
+  `;
+  modalOverlay.style.display = "flex";
+  document.getElementById("modalOkBtn").addEventListener("click", closeModal);
+}
+
+function showPasswordModal(onSuccess){
+  modalBox.innerHTML = `
+    <h3>Staff Login</h3>
+    <p>Enter the staff password to enable editing. It stays unlocked until you reload the page.</p>
+    <input type="password" id="modalPasswordInput" placeholder="Password">
+    <div class="modal-error" id="modalPasswordError"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modalCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="modalSubmitBtn">Unlock editing</button>
+    </div>
+  `;
+  modalOverlay.style.display = "flex";
+  const input = document.getElementById("modalPasswordInput");
+  const errorEl = document.getElementById("modalPasswordError");
+  input.focus();
+
+  function attempt(){
+    if(input.value === STAFF_PASSWORD){
+      closeModal();
+      onSuccess();
+    } else {
+      errorEl.textContent = "Incorrect password. Try again.";
+      input.value = "";
+      input.focus();
+    }
+  }
+
+  document.getElementById("modalSubmitBtn").addEventListener("click", attempt);
+  document.getElementById("modalCancelBtn").addEventListener("click", closeModal);
+  input.addEventListener("keydown", (e) => { if(e.key === "Enter") attempt(); });
+}
+
+function showExportModal(csv, filename){
+  modalBox.innerHTML = `
+    <h3>Export CSV</h3>
+    <p>Copy the text below and paste it into Excel, Sheets, or a plain text file saved as <code>${filename}</code>.</p>
+    <textarea class="export-area" id="exportArea" readonly></textarea>
+    <div class="copy-status" id="copyStatus"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modalCloseBtn">Close</button>
+      <button class="btn btn-primary" id="copyBtn">Copy to Clipboard</button>
+    </div>
+  `;
+  modalOverlay.style.display = "flex";
+  const area = document.getElementById("exportArea");
+  area.value = csv;
+
+  document.getElementById("copyBtn").addEventListener("click", async () => {
+    const statusEl = document.getElementById("copyStatus");
+    try{
+      await navigator.clipboard.writeText(csv);
+      statusEl.textContent = "Copied to clipboard ✓";
+    } catch(err){
+      area.select();
+      try{
+        document.execCommand("copy");
+        statusEl.textContent = "Copied to clipboard ✓";
+      } catch(e2){
+        statusEl.textContent = "Couldn't auto-copy — select the text above and copy manually (Ctrl/Cmd+C).";
+        statusEl.style.color = "var(--warn)";
+      }
+    }
+  });
+  document.getElementById("modalCloseBtn").addEventListener("click", closeModal);
+}
+
+modalOverlay.addEventListener("click", (e) => {
+  if(e.target === modalOverlay) closeModal();
+});
+
+// ---------- Access control: view-only by default, unlock with password ----------
+const STAFF_PASSWORD = "F&B";
+let editMode = false;
+
+const modeBadge = document.getElementById("modeBadge");
+const viewOnlyBanner = document.getElementById("viewOnlyBanner");
+const addPanel = document.getElementById("addPanel");
+const importBtn = document.getElementById("importBtn");
+const importPanel = document.getElementById("importPanel");
+
+function updateModeUI(){
+  if(editMode){
+    modeBadge.textContent = "🔓 Editing Enabled — Lock";
+    modeBadge.className = "mode-badge edit";
+    viewOnlyBanner.style.display = "none";
+    addPanel.style.display = "block";
+    importBtn.style.display = "inline-block";
+  } else {
+    modeBadge.textContent = "🔒 View Only — Staff Login";
+    modeBadge.className = "mode-badge view";
+    viewOnlyBanner.style.display = "flex";
+    addPanel.style.display = "none";
+    importBtn.style.display = "none";
+    importPanel.style.display = "none";
+  }
+}
+
+modeBadge.addEventListener("click", () => {
+  if(editMode){
+    editMode = false;
+    updateModeUI();
+    renderTableSection();
+  } else {
+    showPasswordModal(() => {
+      editMode = true;
+      updateModeUI();
+      renderTableSection();
+    });
+  }
+});
+
+// ---------- Default seed data (used only if Firestore is empty) ----------
+function defaultSeedProducts(){
+  const seed = [
+    // CANDY
+    {name:"Skittles", category:"Candy", caseCost:46.49, unitsPerCase:36, unitCost:1.29, sellPrice:3, link:"https://www.costcobusinesscentre.ca/skittles-original-candy-36--61-g.product.100281410.html"},
+    {name:"Aero", category:"Candy", caseCost:74.29, unitsPerCase:48, unitCost:1.20, sellPrice:3, link:"https://www.costcobusinesscentre.ca/aero-milk-original-chocolate-bars-48--42-g.product.100281765.html"},
+    {name:"Coffee Crisp", category:"Candy", caseCost:74.49, unitsPerCase:48, unitCost:1.12, sellPrice:3, link:"https://www.costcobusinesscentre.ca/coffee-crisp-original-chocolate-wafer-bars-48--50-g.product.100281614.html"},
+    {name:"Twix", category:"Candy", caseCost:52.19, unitsPerCase:36, unitCost:1.34, sellPrice:3, link:"https://www.costcobusinesscentre.ca/twix-cookie-chocolate-bars-36--50-g.product.100282194.html"},
+    {name:"Smarties", category:"Candy", caseCost:37.59, unitsPerCase:24, unitCost:1.41, sellPrice:3, link:"https://www.costcobusinesscentre.ca/smarties-original-chocolate-candy-24--45-g.product.100283379.html"},
+    {name:"Caramilk", category:"Candy", caseCost:62.59, unitsPerCase:48, unitCost:1.16, sellPrice:3, link:"https://www.costcobusinesscentre.ca/cadbury-caramilk-chocolate-bars-48--50-g.product.100283844.html"},
+    {name:"Hershey's CC", category:"Candy", caseCost:48.09, unitsPerCase:36, unitCost:1.06, sellPrice:3, link:"https://www.costcobusinesscentre.ca/hersheys-cookies-n-creme-chocolate-bars-36--43-g.product.100281658.html"},
+    {name:"Cotton Candy", category:"Candy", caseCost:null, unitsPerCase:null, unitCost:2.55, sellPrice:4},
+    {name:"Reese's", category:"Candy", caseCost:65.39, unitsPerCase:48, unitCost:1.13, sellPrice:3, link:"https://www.costcobusinesscentre.ca/reese-peanut-butter-cups-48--46-g.product.100281388.html"},
+    {name:"iSaute candy", category:"Candy", caseCost:null, unitCost:1.20, sellPrice:3},
+    {name:"iSaute candy 2/5$", category:"Candy", caseCost:null, unitCost:2.40, sellPrice:5},
+    // BEVERAGE
+    {name:"Coke/Sprite/Zero", category:"Beverage", caseCost:22.79, unitsPerCase:32, unitCost:0.81, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/p/-/coca-cola-32-355-ml/100281013?remoteHost=app07&sp=lws&langId=-24"},
+    {name:"Gatorade", category:"Beverage", caseCost:29.75, unitsPerCase:28, unitCost:1.30, sellPrice:3, link:"https://www.costcobusinesscentre.ca/gatorade-perform-club-pack-28--591-ml.product.100282340.html"},
+    {name:"Prime", category:"Beverage", caseCost:null, unitsPerCase:null, unitCost:1.65, sellPrice:4.5},
+    {name:"Fuze", category:"Beverage", caseCost:23.09, unitsPerCase:32, unitCost:0.76, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/fuze-iced-tea-32-x-341-ml.product.2001187569.html"},
+    {name:"Bubly", category:"Beverage", caseCost:21.63, unitsPerCase:32, unitCost:0.74, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/bubly-32--355-ml.product.4201050369.html"},
+    {name:"Peace Tea", category:"Beverage", caseCost:null, unitsPerCase:null, unitCost:1.37, sellPrice:3},
+    {name:"Apple juice", category:"Beverage", caseCost:17.77, unitsPerCase:24, unitCost:0.90, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/oasis-apple-juice-24-x-300-ml.product.2001219897.html"},
+    {name:"Orange juice", category:"Beverage", caseCost:22.67, unitsPerCase:24, unitCost:1.03, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/oasis-orange-juice-24--300-ml.product.100335234.html"},
+    {name:"Grape juice", category:"Beverage", caseCost:16.17, unitsPerCase:24, unitCost:0.86, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/oasis-apple-grape-juice-24--300-ml.product.100394365.html"},
+    {name:"Chocolate milk", category:"Beverage", caseCost:14.51, unitsPerCase:16, unitCost:0.97, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/natrel-chocolate-milk-16--200-ml.product.100294634.html"},
+    {name:"Water", category:"Beverage", caseCost:10.49, unitsPerCase:35, unitCost:0.31, sellPrice:2.25, link:"https://www.costcobusinesscentre.ca/eska-natural-spring-water-35--500-ml.product.2001121356.html"},
+    {name:"Coffee (K-cup)", category:"Beverage", caseCost:51.99, unitsPerCase:120, unitCost:0.42, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/kirkland-signature-organic-pacific-bold-fair-trade-coffee-k-cup-pods-pack-of-120.product.2001153667.html"},
+    // HOT FOOD
+    {name:"Pogo", category:"Hot Food", caseCost:19.09, unitsPerCase:30, unitCost:0.60, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/pogo-corn-dogs-pack-of-30.product.100281517.html"},
+    {name:"Pogo (2)", category:"Hot Food", caseCost:17.99, unitCost:1.20, sellPrice:4.5},
+    {name:"Hotdogs w/bun", category:"Hot Food", caseCost:null, unitsPerCase:null, unitCost:1.06, sellPrice:3},
+    {name:"Hotdogs w/bun (2)", category:"Hot Food", caseCost:12.59, unitCost:2.12, sellPrice:5.5},
+    {name:"Jamaican patty", category:"Hot Food", caseCost:24.09, unitsPerCase:24, unitCost:0.96, sellPrice:3, link:"https://www.costcobusinesscentre.ca/patty-king-frozen-jamaican-patties-pack-of-24.product.100319860.html"},
+    {name:"Jamaican patty (2)", category:"Hot Food", caseCost:22.99, unitCost:1.92, sellPrice:5},
+    {name:"Pizza slice", category:"Hot Food", caseCost:null, unitsPerCase:null, unitCost:1.26, sellPrice:3.5},
+    {name:"Pizza slice (2)", category:"Hot Food", caseCost:90.95, unitCost:2.53, sellPrice:6},
+    {name:"Pizza Whole (Cheese)", category:"Hot Food", caseCost:17.39, unitsPerCase:4, unitCost:7.58, sellPrice:16.99, link:"https://www.costcobusinesscentre.ca/kirkland-signature-frozen-cheese-pizza-pack-of-4.product.100282680.html"},
+    {name:"Pizza Whole (Pep)", category:"Hot Food", caseCost:21.79, unitsPerCase:4, unitCost:8.24, sellPrice:16.99, link:"https://www.costcobusinesscentre.ca/kirkland-signature-pepperoni-thin-crust-pizza-4-x-555-g.product.100419209.html"},
+    // HEALTHY
+    {name:"Sandwich", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:2.35, sellPrice:5.99},
+    {name:"Lunch box", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:6.57, sellPrice:10},
+    {name:"Fruit and cheese", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:3.5, sellPrice:3.99},
+    {name:"Veggies and dip", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:3.11, sellPrice:3.99},
+    {name:"Yoghurt and granola", category:"Healthy", caseCost:null, unitsPerCase:null, unitCost:3.12, sellPrice:3.99},
+    // SNACKS
+    {name:"Mini donuts", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:1.32, sellPrice:4},
+    {name:"Cookies", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:0.84, sellPrice:2},
+    {name:"Apple sauce", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:0.45, sellPrice:2},
+    {name:"Lays", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:0.86, sellPrice:2.5},
+    {name:"Doritos", category:"Snacks", caseCost:null, unitsPerCase:null, unitCost:0.92, sellPrice:2.5},
+    // ICE CREAM
+    {name:"Mr. Freeze (2025)", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:0.29, sellPrice:2},
+    {name:"Sandwich (Costco)", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:0.47, sellPrice:3.5},
+    {name:"Drumstick (2024)", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:1.12, sellPrice:3.5},
+    {name:"Minion/Spongebob", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:1.72, sellPrice:2.5},
+    {name:"Cyclone", category:"Ice Cream", caseCost:16.69, unitsPerCase:24, unitCost:1.72, sellPrice:2.5, link:"https://www.costcobusinesscentre.ca/popsicle-cyclone-24-x-80ml.product.4201076472.html"},
+    {name:"Klondike", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:2.42, sellPrice:3.5},
+    {name:"Magnum", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:3.61, sellPrice:4.5},
+    {name:"Haagen-Daz", category:"Ice Cream", caseCost:13.09, unitsPerCase:9, unitCost:2.12, sellPrice:4.5, link:"https://www.costcobusinesscentre.ca/hagen-dazs-vanilla-almond-ice-cream-bars-9--88-ml.product.100314467.html"},
+    {name:"Kitkat", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:1.02, sellPrice:3.5},
+    {name:"Combo (hotdog)", category:"Ice Cream", caseCost:null, unitsPerCase:null, unitCost:3.73, sellPrice:10},
+  ];
+  return seed.map((p, i) => ({id: genId(), country:"CAN", unitsPerCase: null, link: null, ...p}));
+}
+
+function genId(){
+  return "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+}
+
+let products = [];
+let currentCountry = "CAN";
+let activeCategory = "All";
+let searchTerm = "";
+let sortKey = "category";
+let sortDir = 1;
+
+const summaryEl = document.getElementById("summary");
+const chipsEl = document.getElementById("categoryChips");
+const thresholdInput = document.getElementById("threshold");
+const tableSection = document.getElementById("tableSection");
+
+function fmtMoney(v){
+  if(v === null || v === undefined || isNaN(v)) return "—";
+  return "$" + Number(v).toFixed(2);
+}
+function fmtPct(v){
+  if(v === null || v === undefined || isNaN(v)) return "—";
+  return (Number(v)*100).toFixed(1) + "%";
+}
+function computeMargin(p){
+  const dollar = p.sellPrice - p.unitCost;
+  const pct = p.sellPrice > 0 ? dollar / p.sellPrice : 0;
+  return {dollar, pct};
+}
+function marginClass(pct){
+  const target = parseFloat(thresholdInput.value) / 100;
+  if(isNaN(target)) return "m-warn";
+  if(pct >= target) return "m-good";
+  if(pct >= target - 0.1) return "m-warn";
+  return "m-bad";
+}
+
+// Quebec charges a 10¢ deposit on most beverage bottles/cans. This is added
+// automatically to Unit Cost (not the raw Case Cost, which stays as the true
+// supplier price you'd see on the Costco listing) for anything in the
+// Beverage category once both Case Cost and # per Case are filled in.
+const QC_BOTTLE_DEPOSIT = 0.10;
+
+function applyAutoUnitCost(p){
+  const cc = p.caseCost;
+  const upc = p.unitsPerCase;
+  const hasCC = cc !== null && cc !== undefined && !isNaN(cc);
+  const hasUPC = upc !== null && upc !== undefined && !isNaN(upc) && upc > 0;
+  if(hasCC && hasUPC){
+    const deposit = p.category === "Beverage" ? QC_BOTTLE_DEPOSIT : 0;
+    p.unitCost = Math.round(((cc / upc) + deposit) * 100) / 100;
+    p.autoUnitCost = true;
+    p.depositApplied = deposit > 0;
+  } else {
+    p.autoUnitCost = false;
+    p.depositApplied = false;
+  }
+}
+function recalcAllAutoUnitCosts(){
+  products.forEach(applyAutoUnitCost);
+}
+
+function countryProducts(){
+  return products.filter(p => p.country === currentCountry);
+}
+
+function getCategories(){
+  return [...new Set(countryProducts().map(p => p.category))].sort();
+}
+
+function setCountry(c){
+  currentCountry = c;
+  document.getElementById('btn-can').classList.toggle('active', c === 'CAN');
+  document.getElementById('btn-us').classList.toggle('active', c === 'US');
+  document.getElementById('addTargetLabel').textContent = c === 'CAN' ? 'Canada' : 'US';
+  const importTargetLabel = document.getElementById('importTargetLabel');
+  if(importTargetLabel) importTargetLabel.textContent = "→ " + (c === 'CAN' ? 'Canada' : 'US');
+  activeCategory = "All";
+  renderAll();
+}
+
+function renderChips(){
+  const list = countryProducts();
+  const cats = getCategories();
+  chipsEl.innerHTML = "";
+  const all = document.createElement("div");
+  all.className = "chip" + (activeCategory === "All" ? " active" : "");
+  all.textContent = "All (" + list.length + ")";
+  all.onclick = () => { activeCategory = "All"; renderAll(); };
+  chipsEl.appendChild(all);
+  cats.forEach(cat => {
+    const count = list.filter(p => p.category === cat).length;
+    const chip = document.createElement("div");
+    chip.className = "chip" + (activeCategory === cat ? " active" : "");
+    chip.textContent = cat + " (" + count + ")";
+    chip.onclick = () => { activeCategory = cat; renderAll(); };
+    chipsEl.appendChild(chip);
+  });
+
+  const datalist = document.getElementById("catList");
+  datalist.innerHTML = cats.map(c => `<option value="${c}">`).join("");
+}
+
+function renderSummary(){
+  const list = countryProducts();
+  const withMargin = list.map(p => ({...p, ...computeMargin(p)}));
+  const avgPct = withMargin.length ? withMargin.reduce((s,p)=>s+p.pct,0) / withMargin.length : 0;
+  const sorted = [...withMargin].sort((a,b)=>b.pct-a.pct);
+  const best = sorted[0];
+  const worst = sorted[sorted.length-1];
+  const target = parseFloat(thresholdInput.value) / 100;
+  const belowTarget = withMargin.filter(p => p.pct < target).length;
+
+  summaryEl.innerHTML = `
+    <div class="card">
+      <div class="label">Products tracked</div>
+      <div class="value">${list.length}</div>
+      <div class="sub">${getCategories().length} categories · ${currentCountry === 'CAN' ? 'Canada' : 'US'}</div>
+    </div>
+    <div class="card">
+      <div class="label">Average margin</div>
+      <div class="value copper">${list.length ? fmtPct(avgPct) : "—"}</div>
+      <div class="sub">across full menu</div>
+    </div>
+    <div class="card">
+      <div class="label">Best performer</div>
+      <div class="value" style="font-size:18px;">${best ? best.name : "—"}</div>
+      <div class="sub">${best ? fmtPct(best.pct) : ""}</div>
+    </div>
+    <div class="card">
+      <div class="label">Needs attention</div>
+      <div class="value" style="font-size:18px;">${worst ? worst.name : "—"}</div>
+      <div class="sub">${worst ? fmtPct(worst.pct) : ""}</div>
+    </div>
+    <div class="card">
+      <div class="label">Below target</div>
+      <div class="value" style="color:var(--bad);">${belowTarget}</div>
+      <div class="sub">of ${list.length} items under ${thresholdInput.value}%</div>
+    </div>
+  `;
+}
+
+function getFiltered(){
+  let list = countryProducts().filter(p => {
+    const matchesCat = activeCategory === "All" || p.category === activeCategory;
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
+  list = list.map(p => ({...p, ...computeMargin(p)}));
+  list.sort((a,b) => {
+    let av = a[sortKey === "marginDollar" ? "dollar" : sortKey === "marginPct" ? "pct" : sortKey];
+    let bv = b[sortKey === "marginDollar" ? "dollar" : sortKey === "marginPct" ? "pct" : sortKey];
+    if(typeof av === "string") av = av.toLowerCase();
+    if(typeof bv === "string") bv = bv.toLowerCase();
+    if(av === null || av === undefined) av = -Infinity;
+    if(bv === null || bv === undefined) bv = -Infinity;
+    if(av < bv) return -1 * sortDir;
+    if(av > bv) return 1 * sortDir;
+    return 0;
+  });
+  return list;
+}
+
+function escapeHtml(str){
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function renderTableSection(){
+  const list = getFiltered();
+
+  if(countryProducts().length === 0){
+    tableSection.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <path d="M50 8 L88 30 L88 70 L50 92 L12 70 L12 30 Z" fill="none" stroke="#3ec1ff" stroke-width="4" stroke-dasharray="6 6"/>
+            <text x="50" y="58" font-size="30" fill="#3ec1ff" text-anchor="middle" font-family="Arial" font-weight="900">?</text>
+          </svg>
+        </div>
+        <h3>No US Products Yet</h3>
+        <p>Nothing has been entered for the US menu yet. Use the "Add a product" panel below to start building it out — new items will be added to US automatically.</p>
+        <div class="empty-badge">AWAITING DATA ENTRY</div>
+      </div>
+    `;
+    return;
+  }
+
+  tableSection.innerHTML = `
+    <table class="data" id="dataTable">
+      <thead>
+        <tr>
+          <th data-key="category">Category</th>
+          <th data-key="name">Product</th>
+          <th>Link</th>
+          <th class="num" data-key="caseCost">Case Cost</th>
+          <th class="num" data-key="unitsPerCase"># / Case</th>
+          <th class="num" data-key="unitCost">Unit Cost</th>
+          <th class="num" data-key="sellPrice">Sell Price</th>
+          <th class="num" data-key="marginDollar">Margin $</th>
+          <th class="num" data-key="marginPct">Margin %</th>
+          ${editMode ? "<th></th>" : ""}
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="emptyState" style="display:none;">No products match your filters.</div>
+  `;
+
+  attachHeaderSort();
+
+  const body = document.getElementById("tbody");
+  const emptyState = document.getElementById("emptyState");
+  emptyState.style.display = list.length ? "none" : "block";
+
+  list.forEach(p => {
+    const tr = document.createElement("tr");
+    const unitCostTitle = p.autoUnitCost
+      ? (p.depositApplied
+          ? 'title="Auto-calculated: (Case Cost ÷ # per Case) + $0.10 QC bottle/can deposit"'
+          : 'title="Auto-calculated: Case Cost ÷ # per Case"')
+      : "";
+    const linkIcon = p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" class="product-link-icon">🔗 open</a>` : "";
+
+    if(editMode){
+      tr.innerHTML = `
+        <td><span class="cat-pill">${p.category}</span></td>
+        <td class="editable name-cell">
+          <input type="text" value="${escapeHtml(p.name)}" data-id="${p.id}" data-field="name">
+          ${linkIcon}
+        </td>
+        <td class="editable link-cell"><input type="text" value="${escapeHtml(p.link ?? "")}" placeholder="https://..." data-id="${p.id}" data-field="link"></td>
+        <td class="num editable"><input type="number" step="0.01" value="${p.caseCost ?? ""}" placeholder="—" data-id="${p.id}" data-field="caseCost"></td>
+        <td class="num editable"><input type="number" step="1" min="1" value="${p.unitsPerCase ?? ""}" placeholder="—" data-id="${p.id}" data-field="unitsPerCase"></td>
+        <td class="num editable"><input type="number" step="0.01" value="${p.unitCost}" data-id="${p.id}" data-field="unitCost" class="${p.autoUnitCost ? "auto-calc" : ""}" ${p.autoUnitCost ? "readonly" : ""} ${unitCostTitle}></td>
+        <td class="num editable"><input type="number" step="0.01" value="${p.sellPrice}" data-id="${p.id}" data-field="sellPrice"></td>
+        <td class="num">${fmtMoney(p.dollar)}</td>
+        <td class="num"><span class="margin-badge ${marginClass(p.pct)}">${fmtPct(p.pct)}</span></td>
+        <td>
+          <div class="row-actions">
+            <button data-id="${p.id}" class="deleteBtn">Remove</button>
+          </div>
+        </td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td><span class="cat-pill">${p.category}</span></td>
+        <td class="readonly-cell name-cell">${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" style="color:#fff;">${escapeHtml(p.name)}</a>` : escapeHtml(p.name)}</td>
+        <td class="readonly-cell">${p.link ? `<a href="${escapeHtml(p.link)}" target="_blank" rel="noopener" class="product-link-icon">🔗 open</a>` : `<span class="link-empty">—</span>`}</td>
+        <td class="num readonly-cell">${p.caseCost !== null && p.caseCost !== undefined ? fmtMoney(p.caseCost) : "—"}</td>
+        <td class="num readonly-cell">${p.unitsPerCase ?? "—"}</td>
+        <td class="num readonly-cell">${fmtMoney(p.unitCost)}${p.depositApplied ? ' <span class="deposit-mark" title="Includes $0.10 QC bottle/can deposit">†</span>' : ""}</td>
+        <td class="num readonly-cell">${fmtMoney(p.sellPrice)}</td>
+        <td class="num">${fmtMoney(p.dollar)}</td>
+        <td class="num"><span class="margin-badge ${marginClass(p.pct)}">${fmtPct(p.pct)}</span></td>
+      `;
+    }
+    body.appendChild(tr);
+  });
+
+  if(editMode){
+    body.querySelectorAll("input[data-field]").forEach(inp => {
+      inp.addEventListener("change", onFieldChange);
+    });
+    body.querySelectorAll(".deleteBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        products = products.filter(p => p.id !== btn.dataset.id);
+        renderAll();
+        saveProducts();
+      });
+    });
+  }
+}
+
+function attachHeaderSort(){
+  document.querySelectorAll("th[data-key]").forEach(th => {
+    if(th.dataset.key === sortKey) th.classList.add("sorted");
+    th.addEventListener("click", () => {
+      const key = th.dataset.key;
+      if(sortKey === key){
+        sortDir *= -1;
+      } else {
+        sortKey = key;
+        sortDir = 1;
+      }
+      renderTableSection();
+    });
+  });
+}
+
+function onFieldChange(e){
+  if(!editMode) return;
+  const id = e.target.dataset.id;
+  const field = e.target.dataset.field;
+  const p = products.find(p => p.id === id);
+  if(!p) return;
+  if(field === "name"){
+    p.name = e.target.value;
+  } else if(field === "link"){
+    const v = e.target.value.trim();
+    p.link = v === "" ? null : v;
+  } else if(field === "caseCost" || field === "unitsPerCase"){
+    const v = e.target.value === "" ? null : parseFloat(e.target.value);
+    p[field] = (v === null || isNaN(v)) ? null : v;
+  } else {
+    const v = parseFloat(e.target.value);
+    p[field] = isNaN(v) ? 0 : v;
+  }
+  renderAll();
+  saveProducts();
+}
+
+document.getElementById("search").addEventListener("input", (e) => {
+  searchTerm = e.target.value;
+  renderTableSection();
+});
+
+thresholdInput.addEventListener("input", renderAll);
+
+const newCaseCostInput = document.getElementById("newCaseCost");
+const newUnitsPerCaseInput = document.getElementById("newUnitsPerCase");
+const newUnitCostInput = document.getElementById("newUnitCost");
+
+function syncAddPanelAutoCalc(){
+  const cc = parseFloat(newCaseCostInput.value);
+  const upc = parseFloat(newUnitsPerCaseInput.value);
+  if(!isNaN(cc) && !isNaN(upc) && upc > 0){
+    newUnitCostInput.value = (Math.round((cc / upc) * 100) / 100).toFixed(2);
+    newUnitCostInput.readOnly = true;
+  } else {
+    newUnitCostInput.readOnly = false;
+  }
+}
+newCaseCostInput.addEventListener("input", syncAddPanelAutoCalc);
+newUnitsPerCaseInput.addEventListener("input", syncAddPanelAutoCalc);
+
+document.getElementById("addBtn").addEventListener("click", () => {
+  if(!editMode) return;
+  const name = document.getElementById("newName").value.trim();
+  const category = document.getElementById("newCategory").value.trim() || "Uncategorized";
+  const caseCostRaw = document.getElementById("newCaseCost").value;
+  const unitsPerCaseRaw = document.getElementById("newUnitsPerCase").value;
+  const unitCost = parseFloat(document.getElementById("newUnitCost").value);
+  const sellPrice = parseFloat(document.getElementById("newSellPrice").value);
+  const linkRaw = document.getElementById("newLink").value.trim();
+
+  if(!name || isNaN(unitCost) || isNaN(sellPrice)){
+    showMessageModal("Missing info", "Please enter at least a name, unit cost, and sell price. (Unit cost fills in automatically if you enter both Case Cost and # per Case.)");
+    return;
+  }
+
+  products.push({
+    id: genId(),
+    country: currentCountry,
+    name, category,
+    caseCost: caseCostRaw === "" ? null : parseFloat(caseCostRaw),
+    unitsPerCase: unitsPerCaseRaw === "" ? null : parseFloat(unitsPerCaseRaw),
+    unitCost, sellPrice,
+    link: linkRaw === "" ? null : linkRaw
+  });
+
+  document.getElementById("newName").value = "";
+  document.getElementById("newCategory").value = "";
+  document.getElementById("newCaseCost").value = "";
+  document.getElementById("newUnitsPerCase").value = "";
+  document.getElementById("newUnitCost").value = "";
+  document.getElementById("newUnitCost").readOnly = false;
+  document.getElementById("newSellPrice").value = "";
+  document.getElementById("newLink").value = "";
+
+  renderAll();
+  saveProducts();
+  showMessageModal("Product added", `<b>${escapeHtml(name)}</b> was added to ${currentCountry === "CAN" ? "Canada" : "US"}.`);
+});
+
+const importText = document.getElementById("importText");
+const importPreview = document.getElementById("importPreview");
+const importTargetLabel = document.getElementById("importTargetLabel");
+
+function parseImportRows(raw){
+  const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length);
+  const rows = [];
+  const skipped = [];
+  lines.forEach(line => {
+    const delim = line.includes("\t") ? "\t" : ",";
+    const parts = line.split(delim).map(s => s.trim().replace(/^"|"$/g, ""));
+
+    let category, name, caseCostRaw, unitsPerCaseRaw, unitCostRaw, sellPriceRaw, linkRaw;
+    if(parts.length >= 7){
+      [category, name, caseCostRaw, unitsPerCaseRaw, unitCostRaw, sellPriceRaw, linkRaw] = parts;
+    } else if(parts.length === 6){
+      [category, name, caseCostRaw, unitsPerCaseRaw, unitCostRaw, sellPriceRaw] = parts;
+      linkRaw = "";
+    } else if(parts.length === 5){
+      [category, name, caseCostRaw, unitCostRaw, sellPriceRaw] = parts;
+      unitsPerCaseRaw = "";
+      linkRaw = "";
+    } else {
+      skipped.push(line); return;
+    }
+
+    const sellPrice = parseFloat(sellPriceRaw);
+    const caseCostParsed = caseCostRaw === "" || caseCostRaw === undefined ? null : parseFloat(caseCostRaw);
+    const caseCost = (caseCostParsed === null || isNaN(caseCostParsed)) ? null : caseCostParsed;
+    const unitsPerCaseParsed = unitsPerCaseRaw === "" || unitsPerCaseRaw === undefined ? null : parseFloat(unitsPerCaseRaw);
+    const unitsPerCase = (unitsPerCaseParsed === null || isNaN(unitsPerCaseParsed)) ? null : unitsPerCaseParsed;
+    const link = (linkRaw && linkRaw.trim() !== "") ? linkRaw.trim() : null;
+
+    let unitCost = unitCostRaw === "" || unitCostRaw === undefined ? NaN : parseFloat(unitCostRaw);
+    const canAutoCalc = caseCost !== null && unitsPerCase !== null && unitsPerCase > 0;
+    if(canAutoCalc){
+      unitCost = Math.round((caseCost / unitsPerCase) * 100) / 100;
+    }
+
+    if(!name || isNaN(sellPrice) || isNaN(unitCost)){ skipped.push(line); return; }
+
+    rows.push({
+      category: category || "Uncategorized",
+      name,
+      caseCost,
+      unitsPerCase,
+      unitCost, sellPrice,
+      link
+    });
+  });
+  return {rows, skipped};
+}
+
+function updateImportPreview(){
+  const {rows, skipped} = parseImportRows(importText.value);
+  if(!importText.value.trim()){
+    importPreview.innerHTML = "";
+    return;
+  }
+  let html = `<span class="ok">${rows.length} row${rows.length===1?"":"s"} ready</span>`;
+  if(skipped.length) html += ` &nbsp;·&nbsp; <span class="warn">${skipped.length} skipped (header or unreadable)</span>`;
+  importPreview.innerHTML = html;
+}
+
+importBtn.addEventListener("click", () => {
+  if(!editMode) return;
+  const isOpen = importPanel.style.display === "block";
+  if(isOpen){
+    importPanel.style.display = "none";
+    return;
+  }
+  importTargetLabel.textContent = "→ " + (currentCountry === "CAN" ? "Canada" : "US");
+  importPanel.style.display = "block";
+  updateImportPreview();
+});
+
+document.getElementById("importCancelBtn").addEventListener("click", () => {
+  importPanel.style.display = "none";
+  importText.value = "";
+  importPreview.innerHTML = "";
+});
+
+importText.addEventListener("input", updateImportPreview);
+
+document.getElementById("importConfirmBtn").addEventListener("click", () => {
+  if(!editMode) return;
+  const {rows} = parseImportRows(importText.value);
+  if(!rows.length){
+    showMessageModal("No valid rows", "Check the format: <code>Category, Name, Case Cost, # per Case, Unit Cost, Sell Price, Link</code>");
+    return;
+  }
+  rows.forEach(r => {
+    products.push({
+      id: genId(),
+      country: currentCountry,
+      ...r
+    });
+  });
+  const count = rows.length;
+  const countryLabel = currentCountry === "CAN" ? "Canada" : "US";
+  importText.value = "";
+  importPreview.innerHTML = "";
+  importPanel.style.display = "none";
+  renderAll();
+  saveProducts();
+  showMessageModal("Import complete", `Imported <b>${count}</b> product${count===1?"":"s"} into ${countryLabel}.`);
+});
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const rows = [["Country","Category","Product","Case Cost","# per Case","Unit Cost","Sell Price","Margin $","Margin %","Link"]];
+  countryProducts().forEach(p => {
+    const {dollar, pct} = computeMargin(p);
+    rows.push([
+      p.country, p.category, p.name,
+      p.caseCost ?? "",
+      p.unitsPerCase ?? "",
+      p.unitCost, p.sellPrice,
+      dollar.toFixed(2), (pct*100).toFixed(1) + "%",
+      p.link ?? ""
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const filename = "ninja-kidz-margins-" + currentCountry + ".csv";
+  showExportModal(csv, filename);
+});
+
+function renderAll(){
+  recalcAllAutoUnitCosts();
+  renderChips();
+  renderSummary();
+  renderTableSection();
+}
+
+// ---------- Init ----------
+updateModeUI();
+startLiveSync();
+</script>
+</body>
+</html>
